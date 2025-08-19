@@ -1,96 +1,99 @@
+import * as THREE from 'three';
+import { OrbitControls } from './controls.js';
+import { createSky } from './sky.js';
+import { createHoardings } from './hoardings.js';
+import { createGifts } from './gifts.js';
+import { createParticles } from './particles.js';
+import { createTraffic } from './traffic.js';
 
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js'
-import { EffectComposer } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { SSAOPass } from 'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/SSAOPass.js'
+// Scene setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa0d8f0);
 
-import { addSky } from './sky.js'
-import { buildGround, buildCityBlocks, addBillboards, addTrees, addGiftsAndCandies } from './city.js'
-import { makeSparkles } from './particles.js'
-import { makeIntro, makeHUD, setStatsText } from './utils.js'
-import { makeTraffic, updateTraffic } from './traffic.js'
-import { attachTouchControls } from './controls.js'
-import { spinHoardings } from './hoardings.js'
+// Camera
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  2000
+);
+camera.position.set(0, 100, 200);
 
-const CONFIG = { fov:65, bloomStrength:0.75, shadows:true }
+// Renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-let renderer, scene, camera, composer, clock
-let entities = {count:0}
-let hoardingGroup, trafficGroup
+// Controls
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI / 2.1;
 
-makeIntro(init)
+// Lights
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+hemiLight.position.set(0, 200, 0);
+scene.add(hemiLight);
 
-function init(){
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias:true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.outputColorSpace = THREE.SRGBColorSpace
-  renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.05
-  renderer.shadowMap.enabled = CONFIG.shadows
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
-  document.getElementById('app').appendChild(renderer.domElement)
+const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.position.set(-100, 200, -100);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 4096;
+dirLight.shadow.mapSize.height = 4096;
+scene.add(dirLight);
 
-  // Scene & Camera
-  scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(CONFIG.fov, window.innerWidth/window.innerHeight, 0.1, 1000)
-  camera.position.set(12, 8, 14)
-  scene.add(camera)
+// ==================
+// Load Ground Tiles
+// ==================
+const loader = new THREE.TextureLoader();
+const groundGroup = new THREE.Group();
+scene.add(groundGroup);
 
-  // World
-  addSky(scene)
-  scene.add(buildGround())
-  const city = buildCityBlocks(CONFIG, entities); scene.add(city)
-  addTrees(scene)
-  addGiftsAndCandies(scene)
+const tileSize = 500; // each tile size
+const gridSize = 3;   // 3x3 tiles
 
-  // Hoardings row
-  hoardingGroup = new THREE.Group(); addBillboards(hoardingGroup); scene.add(hoardingGroup)
+for (let i = 1; i <= gridSize; i++) {
+  for (let j = 1; j <= gridSize; j++) {
+    const texture = loader.load(`./images/ground_${i}_${j}.jpg`);
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-  // Particles
-  scene.add(makeSparkles())
+    const material = new THREE.MeshStandardMaterial({ map: texture });
+    const geometry = new THREE.PlaneGeometry(tileSize, tileSize);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.rotation.x = -Math.PI / 2;
 
-  // Traffic
-  trafficGroup = makeTraffic(entities); scene.add(trafficGroup)
+    // Positioning tiles
+    mesh.position.x = (j - 2) * tileSize;
+    mesh.position.z = (i - 2) * tileSize;
 
-  // Post FX
-  composer = new EffectComposer(renderer)
-  composer.addPass(new RenderPass(scene, camera))
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), CONFIG.bloomStrength,0.9,0.85))
-  composer.addPass(new SSAOPass(scene,camera,window.innerWidth,window.innerHeight))
-
-  // UI
-  makeHUD()
-
-  // Events
-  window.addEventListener('resize', onResize)
-  renderer.domElement.addEventListener('wheel', (e)=>{
-    e.preventDefault()
-    const d = Math.sign(e.deltaY)
-    camera.position.multiplyScalar(1 + d*0.05)
-  }, {passive:false})
-
-  // Mobile touch controls
-  attachTouchControls(renderer.domElement, camera)
-
-  clock = new THREE.Clock()
-  animate()
+    mesh.receiveShadow = true;
+    groundGroup.add(mesh);
+  }
 }
 
-function onResize(){
-  camera.aspect = window.innerWidth/window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  composer.setSize(window.innerWidth, window.innerHeight)
-}
+// ==================
+// Environment Objects
+// ==================
+createSky(scene, './images/sky.jpg');
+createHoardings(scene);
+createGifts(scene);
+createParticles(scene);
+createTraffic(scene);
 
-function animate(){
-  requestAnimationFrame(animate)
-  const dt = Math.min(clock.getDelta(), 0.033)
-  updateTraffic(trafficGroup, dt)
-  spinHoardings(hoardingGroup, dt)
-  setStatsText(`FPS: ${Math.round(1/dt)} | Entities: ${entities.count}`)
-  composer.render()
+// Responsive resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Animation Loop
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
 }
+animate();
