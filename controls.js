@@ -1,6 +1,5 @@
-
-let touch0 = null, dist0 = 0
 export function attachTouchControls(canvas, camera){
+  let touch0 = null, dist0 = 0
   canvas.addEventListener('touchstart', (e)=>{
     if(e.touches.length===1){ touch0 = {x:e.touches[0].clientX, y:e.touches[0].clientY} }
     if(e.touches.length===2){
@@ -13,7 +12,7 @@ export function attachTouchControls(canvas, camera){
       const dx = e.touches[0].clientX - touch0.x
       const dy = e.touches[0].clientY - touch0.y
       camera.rotation.y -= dx * 0.002
-      camera.rotation.x -= dy * 0.002
+      camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x - dy * 0.002))
       touch0 = {x:e.touches[0].clientX, y:e.touches[0].clientY}
     }
     if(e.touches.length===2){

@@ -1,18 +1,17 @@
-
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js'
-export function makeSparkles(){
-  const count = 1600
-  const pos = new Float32Array(count*3)
+import * as THREE from './libs/three.module.js';
+export function createParticles(scene){
+  const count = 800;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count*3);
   for(let i=0;i<count;i++){
-    const r = 60*Math.random()+6
-    const a = Math.random()*Math.PI*2
-    const h = Math.random()*8 + 3
-    pos[i*3+0] = Math.cos(a)*r
-    pos[i*3+1] = h
-    pos[i*3+2] = Math.sin(a)*r
+    pos[i*3+0] = (Math.random()-0.5)*600;
+    pos[i*3+1] = Math.random()*200 + 10;
+    pos[i*3+2] = (Math.random()-0.5)*600;
   }
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(pos,3))
-  const mat = new THREE.PointsMaterial({ size: 0.06, color: 0x88ccff, transparent:true, opacity:0.9 })
-  return new THREE.Points(geo, mat)
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({ size: 1.8, transparent:true, opacity:0.85 });
+  const points = new THREE.Points(geo, mat);
+  points.name = 'MagicalParticles';
+  scene.add(points);
+  return points;
 }
